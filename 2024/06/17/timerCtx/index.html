@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  
+  
+  <title>timerCtx | Theo&#39;s Pub</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <meta name="description" content="timerCtxtimerCtx是cancelCtx的一种封装, 在cancelCtx提供的手动cancel基础上, 额外提供了定时触发cancel的功能. 其结构定义如下: 123456789type timerCtx struct &#123;    &#x2F;&#x2F; parent context, 这里是cancelCtx    cancelCtx    &#x2F;&#x2F; 计时器    timer *time.Ti">
+<meta property="og:type" content="article">
+<meta property="og:title" content="timerCtx">
+<meta property="og:url" content="https://theo1893.github.io/2024/06/17/timerCtx/index.html">
+<meta property="og:site_name" content="Theo&#39;s Pub">
+<meta property="og:description" content="timerCtxtimerCtx是cancelCtx的一种封装, 在cancelCtx提供的手动cancel基础上, 额外提供了定时触发cancel的功能. 其结构定义如下: 123456789type timerCtx struct &#123;    &#x2F;&#x2F; parent context, 这里是cancelCtx    cancelCtx    &#x2F;&#x2F; 计时器    timer *time.Ti">
+<meta property="og:locale" content="zh_CN">
+<meta property="article:published_time" content="2024-06-17T11:31:27.000Z">
+<meta property="article:modified_time" content="2024-06-17T11:31:27.672Z">
+<meta property="article:author" content="Theo">
+<meta name="twitter:card" content="summary">
+  
+    <link rel="alternate" href="/atom.xml" title="Theo's Pub" type="application/atom+xml">
+  
+  
+    <link rel="shortcut icon" href="/favicon.png">
+  
+  
+  
+<link rel="stylesheet" href="/css/style.css">
+
+  
+    
+<link rel="stylesheet" href="/fancybox/jquery.fancybox.min.css">
+
+  
+  
+<meta name="generator" content="Hexo 7.2.0"></head>
+
+<body>
+  <div id="container">
+    <div id="wrap">
+      <header id="header">
+  <div id="banner"></div>
+  <div id="header-outer" class="outer">
+    <div id="header-title" class="inner">
+      <h1 id="logo-wrap">
+        <a href="/" id="logo">Theo&#39;s Pub</a>
+      </h1>
+      
+    </div>
+    <div id="header-inner" class="inner">
+      <nav id="main-nav">
+        <a id="main-nav-toggle" class="nav-icon"><span class="fa fa-bars"></span></a>
+        
+          <a class="main-nav-link" href="/">Home</a>
+        
+          <a class="main-nav-link" href="/archives">Archives</a>
+        
+      </nav>
+      <nav id="sub-nav">
+        
+        
+          <a class="nav-icon" href="/atom.xml" title="RSS 订阅"><span class="fa fa-rss"></span></a>
+        
+        <a class="nav-icon nav-search-btn" title="搜索"><span class="fa fa-search"></span></a>
+      </nav>
+      <div id="search-form-wrap">
+        <form action="//google.com/search" method="get" accept-charset="UTF-8" class="search-form"><input type="search" name="q" class="search-form-input" placeholder="搜索"><button type="submit" class="search-form-submit">&#xF002;</button><input type="hidden" name="sitesearch" value="https://theo1893.github.io"></form>
+      </div>
+    </div>
+  </div>
+</header>
+
+      <div class="outer">
+        <section id="main"><article id="post-timerCtx" class="h-entry article article-type-post" itemprop="blogPost" itemscope itemtype="https://schema.org/BlogPosting">
+  <div class="article-meta">
+    <a href="/2024/06/17/timerCtx/" class="article-date">
+  <time class="dt-published" datetime="2024-06-17T11:31:27.000Z" itemprop="datePublished">2024-06-17</time>
+</a>
+    
+  </div>
+  <div class="article-inner">
+    
+    
+      <header class="article-header">
+        
+  
+    <h1 class="p-name article-title" itemprop="headline name">
+      timerCtx
+    </h1>
+  
+
+      </header>
+    
+    <div class="e-content article-entry" itemprop="articleBody">
+      
+        <h1 id="timerCtx"><a href="#timerCtx" class="headerlink" title="timerCtx"></a>timerCtx</h1><p>timerCtx是cancelCtx的一种封装, 在cancelCtx提供的手动cancel基础上, 额外提供了定时触发cancel的功能.</p>
+<p>其结构定义如下:</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br></pre></td><td class="code"><pre><span class="line"><span class="keyword">type</span> timerCtx <span class="keyword">struct</span> &#123;</span><br><span class="line">    <span class="comment">// parent context, 这里是cancelCtx</span></span><br><span class="line">    cancelCtx</span><br><span class="line">    <span class="comment">// 计时器</span></span><br><span class="line">    timer *time.Timer</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// cancel时间</span></span><br><span class="line">    deadline time.Time</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="入口函数"><a href="#入口函数" class="headerlink" title="入口函数"></a>入口函数</h2><p>一般使用context.WithDeadline获取timerCtx.</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br><span class="line">15</span><br><span class="line">16</span><br><span class="line">17</span><br><span class="line">18</span><br><span class="line">19</span><br><span class="line">20</span><br><span class="line">21</span><br><span class="line">22</span><br><span class="line">23</span><br><span class="line">24</span><br><span class="line">25</span><br><span class="line">26</span><br><span class="line">27</span><br><span class="line">28</span><br><span class="line">29</span><br><span class="line">30</span><br><span class="line">31</span><br><span class="line">32</span><br><span class="line">33</span><br><span class="line">34</span><br><span class="line">35</span><br><span class="line">36</span><br><span class="line">37</span><br></pre></td><td class="code"><pre><span class="line"><span class="comment">// 一般使用此方法</span></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">WithDeadline</span><span class="params">(parent Context, d time.Time)</span></span> (Context, CancelFunc) &#123;</span><br><span class="line">    <span class="keyword">return</span> WithDeadlineCause(parent, d, <span class="literal">nil</span>)</span><br><span class="line">&#125;</span><br><span class="line"></span><br><span class="line"><span class="function"><span class="keyword">func</span> <span class="title">WithDeadlineCause</span><span class="params">(parent Context, d time.Time, cause <span class="type">error</span>)</span></span> (Context, CancelFunc) &#123;</span><br><span class="line">    ...</span><br><span class="line">    <span class="comment">// parent的deadline &lt; d, 即parent会先触发cancel. </span></span><br><span class="line">    <span class="comment">// 这种情况下child不需要计时器, 返回普通cancelCtx即可, 等待parent触发cancel.</span></span><br><span class="line">    <span class="keyword">if</span> cur, ok := parent.Deadline(); ok &amp;&amp; cur.Before(d) &#123;</span><br><span class="line">        <span class="keyword">return</span> WithCancel(parent)</span><br><span class="line">    &#125;</span><br><span class="line">    c := &amp;timerCtx&#123;</span><br><span class="line">        deadline: d,</span><br><span class="line">    &#125;</span><br><span class="line">    <span class="comment">// 和普通cancelCtx一样, 将c挂载在parent的cancel链上.</span></span><br><span class="line">    c.cancelCtx.propagateCancel(parent, c)</span><br><span class="line">    </span><br><span class="line">    <span class="comment">// 计算还需多久到达deadline</span></span><br><span class="line">    dur := time.Util(d)</span><br><span class="line">    <span class="keyword">if</span> dur &lt;= <span class="number">0</span> &#123;</span><br><span class="line">        <span class="comment">// 已经到达deadline, 则将c直接cancel</span></span><br><span class="line">        c.cancel(<span class="literal">true</span>, DeadlineExceeded, cause)</span><br><span class="line">        <span class="keyword">return</span> c, <span class="function"><span class="keyword">func</span><span class="params">()</span></span> &#123; c.cancel(<span class="literal">false</span>, Canceled, <span class="literal">nil</span>) &#125;</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    c.mu.Lock()</span><br><span class="line">    <span class="keyword">defer</span> c.mu.Unlock()</span><br><span class="line">    <span class="keyword">if</span> c.err == <span class="literal">nil</span> &#123;</span><br><span class="line">        <span class="comment">// 设置定时器, 在dur时间之后cancel掉c</span></span><br><span class="line">        c.timer = time.AfterFunc(dur, <span class="function"><span class="keyword">func</span><span class="params">()</span></span> &#123;</span><br><span class="line">            c.cancel(<span class="literal">true</span>, DeadlineExceeded, cause)</span><br><span class="line">        &#125;)</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    <span class="keyword">return</span> c, <span class="function"><span class="keyword">func</span><span class="params">()</span></span> &#123; c.cancel(<span class="literal">true</span>, Canceled, <span class="literal">nil</span>) &#125;</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+<h2 id="cancel"><a href="#cancel" class="headerlink" title="cancel()"></a>cancel()</h2><p>由于存在定时器, timerCtx重写了cancel方法, 主要为了资源的释放</p>
+<figure class="highlight go"><table><tr><td class="gutter"><pre><span class="line">1</span><br><span class="line">2</span><br><span class="line">3</span><br><span class="line">4</span><br><span class="line">5</span><br><span class="line">6</span><br><span class="line">7</span><br><span class="line">8</span><br><span class="line">9</span><br><span class="line">10</span><br><span class="line">11</span><br><span class="line">12</span><br><span class="line">13</span><br><span class="line">14</span><br></pre></td><td class="code"><pre><span class="line"><span class="function"><span class="keyword">func</span> <span class="params">(c *timerCtx)</span></span> cancel(removeFromParent <span class="type">bool</span>, err, cause <span class="type">error</span>) &#123;</span><br><span class="line">    c.cancelCtx.cancel(<span class="literal">false</span>, err, cause)</span><br><span class="line">    <span class="keyword">if</span> removeFromParent &#123;</span><br><span class="line">        removeChild(c.cancelCtx.Context, c)</span><br><span class="line">    &#125;</span><br><span class="line">    </span><br><span class="line">    c.mu.Lock()</span><br><span class="line">    <span class="comment">// 释放定时器</span></span><br><span class="line">    <span class="keyword">if</span> c.timer != <span class="literal">nil</span> &#123;</span><br><span class="line">        c.timer.Stop()</span><br><span class="line">        c.timer = <span class="literal">nil</span></span><br><span class="line">    &#125;</span><br><span class="line">    c.mu.Unlock()</span><br><span class="line">&#125;</span><br></pre></td></tr></table></figure>
+
+
+
+
+
+      
+    </div>
+    <footer class="article-footer">
+      <a data-url="https://theo1893.github.io/2024/06/17/timerCtx/" data-id="clxiwmtu20004hh8s75jpbitm" data-title="timerCtx" class="article-share-link"><span class="fa fa-share">分享</span></a>
+      
+      
+      
+    </footer>
+  </div>
+  
+    
+<nav id="article-nav">
+  
+  
+    <a href="/2024/06/17/cancelCtx/" id="article-nav-older" class="article-nav-link-wrap">
+      <strong class="article-nav-caption">后一篇</strong>
+      <div class="article-nav-title">cancelCtx</div>
+    </a>
+  
+</nav>
+
+  
+</article>
+
+
+</section>
+        
+          <aside id="sidebar">
+  
+    
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">标签</h3>
+    <div class="widget">
+      <ul class="tag-list" itemprop="keywords"><li class="tag-list-item"><a class="tag-list-link" href="/tags/context/" rel="tag">context</a></li><li class="tag-list-item"><a class="tag-list-link" href="/tags/golang/" rel="tag">golang</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">标签云</h3>
+    <div class="widget tagcloud">
+      <a href="/tags/context/" style="font-size: 10px;">context</a> <a href="/tags/golang/" style="font-size: 10px;">golang</a>
+    </div>
+  </div>
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">归档</h3>
+    <div class="widget">
+      <ul class="archive-list"><li class="archive-list-item"><a class="archive-list-link" href="/archives/2024/06/">六月 2024</a></li></ul>
+    </div>
+  </div>
+
+
+  
+    
+  <div class="widget-wrap">
+    <h3 class="widget-title">最新文章</h3>
+    <div class="widget">
+      <ul>
+        
+          <li>
+            <a href="/2024/06/17/timerCtx/">timerCtx</a>
+          </li>
+        
+          <li>
+            <a href="/2024/06/17/cancelCtx/">cancelCtx</a>
+          </li>
+        
+          <li>
+            <a href="/2024/06/17/valueCtx/">valueCtx</a>
+          </li>
+        
+          <li>
+            <a href="/2024/06/17/context_intro/">context简介</a>
+          </li>
+        
+          <li>
+            <a href="/2024/06/17/hello-world/">Hello World</a>
+          </li>
+        
+      </ul>
+    </div>
+  </div>
+
+  
+</aside>
+        
+      </div>
+      <footer id="footer">
+  
+  <div class="outer">
+    <div id="footer-info" class="inner">
+      
+      &copy; 2024 Theo<br>
+      Powered by <a href="https://hexo.io/" target="_blank">Hexo</a>
+    </div>
+  </div>
+</footer>
+
+    </div>
+    <nav id="mobile-nav">
+  
+    <a href="/" class="mobile-nav-link">Home</a>
+  
+    <a href="/archives" class="mobile-nav-link">Archives</a>
+  
+</nav>
+    
+
+
+<script src="/js/jquery-3.6.4.min.js"></script>
+
+
+
+  
+<script src="/fancybox/jquery.fancybox.min.js"></script>
+
+
+
+
+<script src="/js/script.js"></script>
+
+
+
+
+
+  </div>
+</body>
+</html>
