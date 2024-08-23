@@ -1,0 +1,192 @@
+<!DOCTYPE html><html lang="zh-CN" data-theme="light"><head><meta charset="UTF-8"><meta http-equiv="X-UA-Compatible" content="IE=edge"><meta name="viewport" content="width=device-width, initial-scale=1.0,viewport-fit=cover"><title>Redis源码图解(16) 我们在客户端使用SET命令, 直到服务端返回, 发生了什么(单机) | Theo's Pub</title><meta name="author" content="Theo"><meta name="copyright" content="Theo"><meta name="format-detection" content="telephone=no"><meta name="theme-color" content="#ffffff"><meta name="description" content="一条SET指令的处理流程本节介绍单机模式下, 开启多线程写和多线程读时, 一条SET NX指令的主要处理流程. 有部分个人认为对理解Redis核心逻辑无益的流程不会介绍. 建立TCP连接第一步, 客户端向服务端发起连接建立的请求. 在前面的章节中, 我们知道服务端在启动后, 会注册socket监听事件, 并进入AE事件循环, 如下图所示.  在收到客户端建立连接的请求后, 服务端的监听socket">
+<meta property="og:type" content="article">
+<meta property="og:title" content="Redis源码图解(16) 我们在客户端使用SET命令, 直到服务端返回, 发生了什么(单机)">
+<meta property="og:url" content="https://theo1893.github.io/2024/08/19/HowDoesSETNXWorks/index.html">
+<meta property="og:site_name" content="Theo&#39;s Pub">
+<meta property="og:description" content="一条SET指令的处理流程本节介绍单机模式下, 开启多线程写和多线程读时, 一条SET NX指令的主要处理流程. 有部分个人认为对理解Redis核心逻辑无益的流程不会介绍. 建立TCP连接第一步, 客户端向服务端发起连接建立的请求. 在前面的章节中, 我们知道服务端在启动后, 会注册socket监听事件, 并进入AE事件循环, 如下图所示.  在收到客户端建立连接的请求后, 服务端的监听socket">
+<meta property="og:locale" content="zh_CN">
+<meta property="og:image" content="https://i.loli.net/2021/02/24/5O1day2nriDzjSu.png">
+<meta property="article:published_time" content="2024-08-19T08:34:21.000Z">
+<meta property="article:modified_time" content="2024-08-23T07:41:12.528Z">
+<meta property="article:author" content="Theo">
+<meta property="article:tag" content="redis">
+<meta name="twitter:card" content="summary">
+<meta name="twitter:image" content="https://i.loli.net/2021/02/24/5O1day2nriDzjSu.png"><link rel="shortcut icon" href="/img/favicon.png"><link rel="canonical" href="https://theo1893.github.io/2024/08/19/HowDoesSETNXWorks/index.html"><link rel="preconnect" href="//cdn.jsdelivr.net"/><link rel="preconnect" href="//busuanzi.ibruce.info"/><link rel="stylesheet" href="/css/index.css?v=4.13.0"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@6.5.1/css/all.min.css"><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fancyapps/ui@5.0.33/dist/fancybox/fancybox.min.css" media="print" onload="this.media='all'"><script>const GLOBAL_CONFIG = {
+  root: '/',
+  algolia: undefined,
+  localSearch: undefined,
+  translate: undefined,
+  noticeOutdate: undefined,
+  highlight: {"plugin":"highlight.js","highlightCopy":true,"highlightLang":true,"highlightHeightLimit":false},
+  copy: {
+    success: '复制成功',
+    error: '复制错误',
+    noSupport: '浏览器不支持'
+  },
+  relativeDate: {
+    homepage: false,
+    post: false
+  },
+  runtime: '',
+  dateSuffix: {
+    just: '刚刚',
+    min: '分钟前',
+    hour: '小时前',
+    day: '天前',
+    month: '个月前'
+  },
+  copyright: undefined,
+  lightbox: 'fancybox',
+  Snackbar: undefined,
+  infinitegrid: {
+    js: 'https://cdn.jsdelivr.net/npm/@egjs/infinitegrid@4.11.1/dist/infinitegrid.min.js',
+    buttonText: '加载更多'
+  },
+  isPhotoFigcaption: false,
+  islazyload: false,
+  isAnchor: false,
+  percent: {
+    toc: true,
+    rightside: false,
+  },
+  autoDarkmode: false
+}</script><script id="config-diff">var GLOBAL_CONFIG_SITE = {
+  title: 'Redis源码图解(16) 我们在客户端使用SET命令, 直到服务端返回, 发生了什么(单机)',
+  isPost: true,
+  isHome: false,
+  isHighlightShrink: false,
+  isToc: true,
+  postUpdate: '2024-08-23 15:41:12'
+}</script><script>(win=>{
+      win.saveToLocal = {
+        set: (key, value, ttl) => {
+          if (ttl === 0) return
+          const now = Date.now()
+          const expiry = now + ttl * 86400000
+          const item = {
+            value,
+            expiry
+          }
+          localStorage.setItem(key, JSON.stringify(item))
+        },
+      
+        get: key => {
+          const itemStr = localStorage.getItem(key)
+      
+          if (!itemStr) {
+            return undefined
+          }
+          const item = JSON.parse(itemStr)
+          const now = Date.now()
+      
+          if (now > item.expiry) {
+            localStorage.removeItem(key)
+            return undefined
+          }
+          return item.value
+        }
+      }
+    
+      win.getScript = (url, attr = {}) => new Promise((resolve, reject) => {
+        const script = document.createElement('script')
+        script.src = url
+        script.async = true
+        script.onerror = reject
+        script.onload = script.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          script.onload = script.onreadystatechange = null
+          resolve()
+        }
+
+        Object.keys(attr).forEach(key => {
+          script.setAttribute(key, attr[key])
+        })
+
+        document.head.appendChild(script)
+      })
+    
+      win.getCSS = (url, id = false) => new Promise((resolve, reject) => {
+        const link = document.createElement('link')
+        link.rel = 'stylesheet'
+        link.href = url
+        if (id) link.id = id
+        link.onerror = reject
+        link.onload = link.onreadystatechange = function() {
+          const loadState = this.readyState
+          if (loadState && loadState !== 'loaded' && loadState !== 'complete') return
+          link.onload = link.onreadystatechange = null
+          resolve()
+        }
+        document.head.appendChild(link)
+      })
+    
+      win.activateDarkMode = () => {
+        document.documentElement.setAttribute('data-theme', 'dark')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#0d0d0d')
+        }
+      }
+      win.activateLightMode = () => {
+        document.documentElement.setAttribute('data-theme', 'light')
+        if (document.querySelector('meta[name="theme-color"]') !== null) {
+          document.querySelector('meta[name="theme-color"]').setAttribute('content', '#ffffff')
+        }
+      }
+      const t = saveToLocal.get('theme')
+    
+        if (t === 'dark') activateDarkMode()
+        else if (t === 'light') activateLightMode()
+      
+      const asideStatus = saveToLocal.get('aside-status')
+      if (asideStatus !== undefined) {
+        if (asideStatus === 'hide') {
+          document.documentElement.classList.add('hide-aside')
+        } else {
+          document.documentElement.classList.remove('hide-aside')
+        }
+      }
+    
+      const detectApple = () => {
+        if(/iPad|iPhone|iPod|Macintosh/.test(navigator.userAgent)){
+          document.documentElement.classList.add('apple')
+        }
+      }
+      detectApple()
+    })(window)</script><meta name="generator" content="Hexo 7.2.0"></head><body><div id="sidebar"><div id="menu-mask"></div><div id="sidebar-menus"><div class="avatar-img is-center"><img src="https://i.loli.net/2021/02/24/5O1day2nriDzjSu.png" onerror="onerror=null;src='/img/friend_404.gif'" alt="avatar"/></div><div class="sidebar-site-data site-data is-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">21</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">3</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">1</div></a></div><hr class="custom-hr"/></div></div><div class="post" id="body-wrap"><header class="post-bg" id="page-header"><nav id="nav"><span id="blog-info"><a href="/" title="Theo's Pub"><span class="site-name">Theo's Pub</span></a></span><div id="menus"><div id="toggle-menu"><a class="site-page" href="javascript:void(0);"><i class="fas fa-bars fa-fw"></i></a></div></div></nav><div id="post-info"><h1 class="post-title">Redis源码图解(16) 我们在客户端使用SET命令, 直到服务端返回, 发生了什么(单机)</h1><div id="post-meta"><div class="meta-firstline"><span class="post-meta-date"><i class="far fa-calendar-alt fa-fw post-meta-icon"></i><span class="post-meta-label">发表于</span><time class="post-meta-date-created" datetime="2024-08-19T08:34:21.000Z" title="发表于 2024-08-19 16:34:21">2024-08-19</time><span class="post-meta-separator">|</span><i class="fas fa-history fa-fw post-meta-icon"></i><span class="post-meta-label">更新于</span><time class="post-meta-date-updated" datetime="2024-08-23T07:41:12.528Z" title="更新于 2024-08-23 15:41:12">2024-08-23</time></span><span class="post-meta-categories"><span class="post-meta-separator">|</span><i class="fas fa-inbox fa-fw post-meta-icon"></i><a class="post-meta-categories" href="/categories/Tech/">Tech</a></span></div><div class="meta-secondline"><span class="post-meta-separator">|</span><span class="post-meta-pv-cv" id="" data-flag-title="Redis源码图解(16) 我们在客户端使用SET命令, 直到服务端返回, 发生了什么(单机)"><i class="far fa-eye fa-fw post-meta-icon"></i><span class="post-meta-label">阅读量:</span><span id="busuanzi_value_page_pv"><i class="fa-solid fa-spinner fa-spin"></i></span></span></div></div></div></header><main class="layout" id="content-inner"><div id="post"><article class="post-content" id="article-container"><h1 id="一条SET指令的处理流程"><a href="#一条SET指令的处理流程" class="headerlink" title="一条SET指令的处理流程"></a>一条SET指令的处理流程</h1><p>本节介绍<strong>单机模式</strong>下, 开启<strong>多线程写</strong>和<strong>多线程读</strong>时, 一条SET NX指令的主要处理流程.</p>
+<p>有部分个人认为对理解Redis核心逻辑无益的流程不会介绍.</p>
+<h2 id="建立TCP连接"><a href="#建立TCP连接" class="headerlink" title="建立TCP连接"></a>建立TCP连接</h2><p>第一步, 客户端向服务端发起连接建立的请求.</p>
+<p>在前面的章节中, 我们知道服务端在启动后, 会注册socket监听事件, 并进入AE事件循环, 如下图所示.</p>
+<p><img src="/2024/08/19/HowDoesSETNXWorks/event_loop.png"></p>
+<p>在收到客户端建立连接的请求后, 服务端的监听socket变为可读, AE事件总线在一次查询内核的过程中, 得知监听socket可读, 便进入此事件的处理流程: </p>
+<ol>
+<li>创建新的TCP连接;</li>
+<li>为这些连接分别注册AE监听事件;</li>
+</ol>
+<p>具体的流程如下图所示, AE总线在本次循环结束后新注册了1个文件事件.</p>
+<p><img src="/2024/08/19/HowDoesSETNXWorks/event_loop_accept_connection.png"></p>
+<h2 id="RESP-REdis-Serialization-Protocol-协议"><a href="#RESP-REdis-Serialization-Protocol-协议" class="headerlink" title="RESP(REdis Serialization Protocol)协议"></a>RESP(REdis Serialization Protocol)协议</h2><p>Redis基于TCP实现了RESP协议, 用于客户端和服务端之间的通信.</p>
+<p>我们在客户端输入以下指令:</p>
+<figure class="highlight shell"><table><tr><td class="gutter"><pre><span class="line">1</span><br></pre></td><td class="code"><pre><span class="line">SET k1 v1 NX EX 3</span><br></pre></td></tr></table></figure>
+
+<p>客户端会将这条指令转换为如下的字节流:</p>
+<p><img src="/2024/08/19/HowDoesSETNXWorks/resp_set_byte.png"></p>
+<p>客户端然后将这组字节写入建立的连接中.</p>
+<h2 id="Redis处理客户端请求"><a href="#Redis处理客户端请求" class="headerlink" title="Redis处理客户端请求"></a>Redis处理客户端请求</h2><p>在某次事件循环中, Redis从内核得知上文建立的socket变为可读, 调用其注册的读方法.</p>
+<p>由于开启了多线程读, <strong>本次请求会被缓存到延迟读队列</strong>, 不会发生实际的读取操作.</p>
+<p>大致流程如下.</p>
+<p><img src="/2024/08/19/HowDoesSETNXWorks/event_loop_epoch_1.png"></p>
+<h2 id="Redis进入下一轮事件循环"><a href="#Redis进入下一轮事件循环" class="headerlink" title="Redis进入下一轮事件循环"></a>Redis进入下一轮事件循环</h2><p>Redis在进入下一轮事件循环后, 首先调用beforesleep()方法, 处理被延迟的读连接和写连接.</p>
+<h3 id="多线程处理延迟读"><a href="#多线程处理延迟读" class="headerlink" title="多线程处理延迟读"></a>多线程处理延迟读</h3><p>在此时, Redis将前文的连接分发给主线程和子线程, 进行实际的读取操作: </p>
+<p>解析RESP协议格式的字节流, 将解析结果保存在连接对象中.</p>
+<p>这里需要注意的是, 在此阶段Redis主线程并不会进行指令处理.</p>
+<h3 id="主线程处理指令"><a href="#主线程处理指令" class="headerlink" title="主线程处理指令"></a>主线程处理指令</h3><p>等待所有线程完成读操作后, 主线程开始顺序处理每个连接的指令.</p>
+<h4 id="查询指令表-Command-Table"><a href="#查询指令表-Command-Table" class="headerlink" title="查询指令表(Command Table)"></a>查询指令表(Command Table)</h4><p>在Redis初始化章节, 我们介绍过Redis维护了一张指令表, 此时在处理客户端请求时会在指令表中查询SET对应的入口函数.</p>
+<h4 id="将Key-Value写入数据存储"><a href="#将Key-Value写入数据存储" class="headerlink" title="将Key-Value写入数据存储"></a>将Key-Value写入数据存储</h4><p>在Dict的章节中, 我们介绍过Redis的DB结构实际使用的就是Dict. 在SET对应的函数中, 指定的key-value会被写入Redis的数据存储, 写入流程参考Dict的插入流程.</p>
+<h4 id="将Key-Expiry写入过期存储"><a href="#将Key-Expiry写入过期存储" class="headerlink" title="将Key-Expiry写入过期存储"></a>将Key-Expiry写入过期存储</h4><p>除了数据存储, Redis还维护了一份过期存储, 同样采用Dict结构, 存储了每个Key和对应的Expiry.</p>
+<p>在这个场景下, 我们为k1指定了3s的过期时间, 因此expiry &#x3D; 当前时间+3s 会被存储在过期存储中.</p>
+<h4 id="回复给客户端"><a href="#回复给客户端" class="headerlink" title="回复给客户端"></a>回复给客户端</h4><p>此时操作全部完成, 由于开启了多线程写, Redis将此连接放到<strong>延迟写队列</strong>, 此时不进行实际的写操作.</p>
+<h4 id="多线程处理延迟写"><a href="#多线程处理延迟写" class="headerlink" title="多线程处理延迟写"></a>多线程处理延迟写</h4><p>在此时, 由于开启了多线程写, Redis会把前文主线程处理完成后等待写入的连接, 从延迟写队列拿出来, 分发给主线程和子线程, 将返回写入socket.</p>
+<h2 id="全流程示意图"><a href="#全流程示意图" class="headerlink" title="全流程示意图"></a>全流程示意图</h2><p>串联上述步骤的图示如下.</p>
+<p><img src="/2024/08/19/HowDoesSETNXWorks/process_command.png"></p>
+</article><div class="post-copyright"><div class="post-copyright__author"><span class="post-copyright-meta"><i class="fas fa-circle-user fa-fw"></i>文章作者: </span><span class="post-copyright-info"><a href="https://theo1893.github.io">Theo</a></span></div><div class="post-copyright__type"><span class="post-copyright-meta"><i class="fas fa-square-arrow-up-right fa-fw"></i>文章链接: </span><span class="post-copyright-info"><a href="https://theo1893.github.io/2024/08/19/HowDoesSETNXWorks/">https://theo1893.github.io/2024/08/19/HowDoesSETNXWorks/</a></span></div><div class="post-copyright__notice"><span class="post-copyright-meta"><i class="fas fa-circle-exclamation fa-fw"></i>版权声明: </span><span class="post-copyright-info">本博客所有文章除特别声明外，均采用 <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> 许可协议。转载请注明来自 <a href="https://theo1893.github.io" target="_blank">Theo's Pub</a>！</span></div></div><div class="tag_share"><div class="post-meta__tag-list"><a class="post-meta__tags" href="/tags/redis/">redis</a></div><div class="post_share"><div class="social-share" data-image="https://i.loli.net/2021/02/24/5O1day2nriDzjSu.png" data-sites="facebook,twitter,wechat,weibo,qq"></div><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.3/sharejs/dist/css/share.min.css" media="print" onload="this.media='all'"><script src="https://cdn.jsdelivr.net/npm/butterfly-extsrc@1.1.3/sharejs/dist/js/social-share.min.js" defer></script></div></div><nav class="pagination-post" id="pagination"><div class="prev-post pull-left"><a href="/2024/08/21/HowDoesGETWorks/" title="Redis源码图解(17) 我们在客户端使用GET命令, 直到服务端返回, 发生了什么(单机)"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">上一篇</div><div class="prev_info">Redis源码图解(17) 我们在客户端使用GET命令, 直到服务端返回, 发生了什么(单机)</div></div></a></div><div class="next-post pull-right"><a href="/2024/08/19/WhatDoesRedisDoWhenStarting/" title="Redis源码图解(15) Redis服务端在启动时做了什么(单机)"><div class="cover" style="background: var(--default-bg-color)"></div><div class="pagination-info"><div class="label">下一篇</div><div class="next_info">Redis源码图解(15) Redis服务端在启动时做了什么(单机)</div></div></a></div></nav><div class="relatedPosts"><div class="headline"><i class="fas fa-thumbs-up fa-fw"></i><span>相关推荐</span></div><div class="relatedPosts-list"><div><a href="/2024/08/08/Dict/" title="Redis源码图解(3) 底层编码HT(Dict)"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2024-08-08</div><div class="title">Redis源码图解(3) 底层编码HT(Dict)</div></div></a></div><div><a href="/2024/08/15/Hash/" title="Redis源码图解(10) 高级类型Hash"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2024-08-15</div><div class="title">Redis源码图解(10) 高级类型Hash</div></div></a></div><div><a href="/2024/08/21/HowDoesGETWorks/" title="Redis源码图解(17) 我们在客户端使用GET命令, 直到服务端返回, 发生了什么(单机)"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2024-08-21</div><div class="title">Redis源码图解(17) 我们在客户端使用GET命令, 直到服务端返回, 发生了什么(单机)</div></div></a></div><div><a href="/2024/08/12/IntSet/" title="Redis源码图解(7) 底层编码IntSet"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2024-08-12</div><div class="title">Redis源码图解(7) 底层编码IntSet</div></div></a></div><div><a href="/2024/08/16/List/" title="Redis源码图解(11) 高级类型List"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2024-08-16</div><div class="title">Redis源码图解(11) 高级类型List</div></div></a></div><div><a href="/2024/08/09/ListPack/" title="Redis源码图解(4) 底层编码ListPack"><div class="cover" style="background: var(--default-bg-color)"></div><div class="content is-center"><div class="date"><i class="far fa-calendar-alt fa-fw"></i> 2024-08-09</div><div class="title">Redis源码图解(4) 底层编码ListPack</div></div></a></div></div></div></div><div class="aside-content" id="aside-content"><div class="card-widget card-info"><div class="is-center"><div class="avatar-img"><img src="https://i.loli.net/2021/02/24/5O1day2nriDzjSu.png" onerror="this.onerror=null;this.src='/img/friend_404.gif'" alt="avatar"/></div><div class="author-info__name">Theo</div><div class="author-info__description">This is nil.</div></div><div class="card-info-data site-data is-center"><a href="/archives/"><div class="headline">文章</div><div class="length-num">21</div></a><a href="/tags/"><div class="headline">标签</div><div class="length-num">3</div></a><a href="/categories/"><div class="headline">分类</div><div class="length-num">1</div></a></div><a id="card-info-btn" target="_blank" rel="noopener" href="https://github.com/xxxxxx"><i class="fab fa-github"></i><span>Follow Me</span></a></div><div class="card-widget card-announcement"><div class="item-headline"><i class="fas fa-bullhorn fa-shake"></i><span>公告</span></div><div class="announcement_content">This is my Blog</div></div><div class="sticky_layout"><div class="card-widget" id="card-toc"><div class="item-headline"><i class="fas fa-stream"></i><span>目录</span><span class="toc-percentage"></span></div><div class="toc-content"><ol class="toc"><li class="toc-item toc-level-1"><a class="toc-link" href="#%E4%B8%80%E6%9D%A1SET%E6%8C%87%E4%BB%A4%E7%9A%84%E5%A4%84%E7%90%86%E6%B5%81%E7%A8%8B"><span class="toc-number">1.</span> <span class="toc-text">一条SET指令的处理流程</span></a><ol class="toc-child"><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%BB%BA%E7%AB%8BTCP%E8%BF%9E%E6%8E%A5"><span class="toc-number">1.1.</span> <span class="toc-text">建立TCP连接</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#RESP-REdis-Serialization-Protocol-%E5%8D%8F%E8%AE%AE"><span class="toc-number">1.2.</span> <span class="toc-text">RESP(REdis Serialization Protocol)协议</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#Redis%E5%A4%84%E7%90%86%E5%AE%A2%E6%88%B7%E7%AB%AF%E8%AF%B7%E6%B1%82"><span class="toc-number">1.3.</span> <span class="toc-text">Redis处理客户端请求</span></a></li><li class="toc-item toc-level-2"><a class="toc-link" href="#Redis%E8%BF%9B%E5%85%A5%E4%B8%8B%E4%B8%80%E8%BD%AE%E4%BA%8B%E4%BB%B6%E5%BE%AA%E7%8E%AF"><span class="toc-number">1.4.</span> <span class="toc-text">Redis进入下一轮事件循环</span></a><ol class="toc-child"><li class="toc-item toc-level-3"><a class="toc-link" href="#%E5%A4%9A%E7%BA%BF%E7%A8%8B%E5%A4%84%E7%90%86%E5%BB%B6%E8%BF%9F%E8%AF%BB"><span class="toc-number">1.4.1.</span> <span class="toc-text">多线程处理延迟读</span></a></li><li class="toc-item toc-level-3"><a class="toc-link" href="#%E4%B8%BB%E7%BA%BF%E7%A8%8B%E5%A4%84%E7%90%86%E6%8C%87%E4%BB%A4"><span class="toc-number">1.4.2.</span> <span class="toc-text">主线程处理指令</span></a><ol class="toc-child"><li class="toc-item toc-level-4"><a class="toc-link" href="#%E6%9F%A5%E8%AF%A2%E6%8C%87%E4%BB%A4%E8%A1%A8-Command-Table"><span class="toc-number">1.4.2.1.</span> <span class="toc-text">查询指令表(Command Table)</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%E5%B0%86Key-Value%E5%86%99%E5%85%A5%E6%95%B0%E6%8D%AE%E5%AD%98%E5%82%A8"><span class="toc-number">1.4.2.2.</span> <span class="toc-text">将Key-Value写入数据存储</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%E5%B0%86Key-Expiry%E5%86%99%E5%85%A5%E8%BF%87%E6%9C%9F%E5%AD%98%E5%82%A8"><span class="toc-number">1.4.2.3.</span> <span class="toc-text">将Key-Expiry写入过期存储</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%E5%9B%9E%E5%A4%8D%E7%BB%99%E5%AE%A2%E6%88%B7%E7%AB%AF"><span class="toc-number">1.4.2.4.</span> <span class="toc-text">回复给客户端</span></a></li><li class="toc-item toc-level-4"><a class="toc-link" href="#%E5%A4%9A%E7%BA%BF%E7%A8%8B%E5%A4%84%E7%90%86%E5%BB%B6%E8%BF%9F%E5%86%99"><span class="toc-number">1.4.2.5.</span> <span class="toc-text">多线程处理延迟写</span></a></li></ol></li></ol></li><li class="toc-item toc-level-2"><a class="toc-link" href="#%E5%85%A8%E6%B5%81%E7%A8%8B%E7%A4%BA%E6%84%8F%E5%9B%BE"><span class="toc-number">1.5.</span> <span class="toc-text">全流程示意图</span></a></li></ol></li></ol></div></div><div class="card-widget card-recent-post"><div class="item-headline"><i class="fas fa-history"></i><span>最新文章</span></div><div class="aside-list"><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2024/08/21/HowDoesGETWorks/" title="Redis源码图解(17) 我们在客户端使用GET命令, 直到服务端返回, 发生了什么(单机)">Redis源码图解(17) 我们在客户端使用GET命令, 直到服务端返回, 发生了什么(单机)</a><time datetime="2024-08-21T08:02:59.000Z" title="发表于 2024-08-21 16:02:59">2024-08-21</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2024/08/19/HowDoesSETNXWorks/" title="Redis源码图解(16) 我们在客户端使用SET命令, 直到服务端返回, 发生了什么(单机)">Redis源码图解(16) 我们在客户端使用SET命令, 直到服务端返回, 发生了什么(单机)</a><time datetime="2024-08-19T08:34:21.000Z" title="发表于 2024-08-19 16:34:21">2024-08-19</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2024/08/19/WhatDoesRedisDoWhenStarting/" title="Redis源码图解(15) Redis服务端在启动时做了什么(单机)">Redis源码图解(15) Redis服务端在启动时做了什么(单机)</a><time datetime="2024-08-19T06:22:01.000Z" title="发表于 2024-08-19 14:22:01">2024-08-19</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2024/08/18/RedisAEEvent/" title="Redis源码图解(14) Redis 多路复用机制——AE事件模型">Redis源码图解(14) Redis 多路复用机制——AE事件模型</a><time datetime="2024-08-18T08:52:12.000Z" title="发表于 2024-08-18 16:52:12">2024-08-18</time></div></div><div class="aside-list-item no-cover"><div class="content"><a class="title" href="/2024/08/17/ZSet/" title="Redis源码图解(13) 高级类型ZSet">Redis源码图解(13) 高级类型ZSet</a><time datetime="2024-08-17T05:06:39.000Z" title="发表于 2024-08-17 13:06:39">2024-08-17</time></div></div></div></div></div></div></main><footer id="footer"><div id="footer-wrap"><div class="copyright">&copy;2020 - 2024 By Theo</div><div class="framework-info"><span>框架 </span><a target="_blank" rel="noopener" href="https://hexo.io">Hexo</a><span class="footer-separator">|</span><span>主题 </span><a target="_blank" rel="noopener" href="https://github.com/jerryc127/hexo-theme-butterfly">Butterfly</a></div></div></footer></div><div id="rightside"><div id="rightside-config-hide"><button id="readmode" type="button" title="阅读模式"><i class="fas fa-book-open"></i></button><button id="darkmode" type="button" title="浅色和深色模式转换"><i class="fas fa-adjust"></i></button><button id="hide-aside-btn" type="button" title="单栏和双栏切换"><i class="fas fa-arrows-alt-h"></i></button></div><div id="rightside-config-show"><button id="rightside-config" type="button" title="设置"><i class="fas fa-cog fa-spin"></i></button><button class="close" id="mobile-toc-button" type="button" title="目录"><i class="fas fa-list-ul"></i></button><button id="go-up" type="button" title="回到顶部"><span class="scroll-percent"></span><i class="fas fa-arrow-up"></i></button></div></div><div><script src="/js/utils.js?v=4.13.0"></script><script src="/js/main.js?v=4.13.0"></script><script src="https://cdn.jsdelivr.net/npm/@fancyapps/ui@5.0.33/dist/fancybox/fancybox.umd.min.js"></script><div class="js-pjax"></div><script async data-pjax src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script></div></body></html>
