@@ -1,6 +1,8 @@
 ---
 title: context简介
 date: 2024-06-17 19:30:40
+categories:
+- Tech
 tags:
 - golang
 - context

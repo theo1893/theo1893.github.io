@@ -1,6 +1,8 @@
 ---
 title: valueCtx
 date: 2024-06-17 19:31:18
+categories:
+- Tech
 tags:
 - golang
 - context

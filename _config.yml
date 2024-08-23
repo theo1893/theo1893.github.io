@@ -1,6 +1,6 @@
 title: Theo's Pub
 subtitle: ''
-description: This is how we live.
+description: This is nil.
 keywords: null
 author: Theo
 language: zh-CN
@@ -15,7 +15,7 @@ source_dir: source
 public_dir: public
 tag_dir: tags
 archive_dir: archives
-category_dir: categories
+# category_dir: categories
 code_dir: downloads/code
 i18n_dir: ':lang'
 skip_render: null
@@ -58,7 +58,7 @@ pagination_dir: page
 include: null
 exclude: null
 ignore: null
-theme: next
+theme: butterfly
 deploy:
   type: git
   repo: git@github.com:theo1893/theo1893.github.io.git
