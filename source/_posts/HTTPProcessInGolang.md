@@ -67,6 +67,18 @@ HTTP报文结构如下.
 
 因此, 对Client和Server而言机制是相同的: Client取消请求, 导致底层TCP连接被关闭; Server监听到TCP连接被关闭, 为完成的请求被中断.
 
+Client侧核心代码如下.
+
+```go
+func (pc *persistConn) cancelRequest(err error) {
+    pc.mu.Lock()
+    defer pc.mu.Unlock()
+    pc.canceledErr = err
+    // 关闭TCP连接
+    pc.closeLocked(errRequestCanceled)
+}
+```
+
 ## HTTP库对HTTP1.1 Pipeline机制的支持
 
 别用. 
