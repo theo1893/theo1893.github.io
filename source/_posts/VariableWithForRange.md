@@ -1,5 +1,5 @@
 ---
-title: Golang杂项 For-Range中的变量汇编分析
+title: Golang杂学 For-Range中的变量汇编分析
 date: 2024-08-23 18:10:09
 categories:
 - Tech
@@ -9,7 +9,7 @@ tags:
 
 # For-Range中的变量汇编分析
 
-众所周知, 在Golang早期版本中, For-Range得到的值如果送进协程进行并发处理, 非常危险, 原因是value在每一次循环中均为同一块内存. 
+众所周知, 在Golang早期版本(1.22之前)中, For-Range得到的值如果送进协程进行并发处理, 非常危险, 原因是value在每一次循环中均为同一块内存. 
 
 下面从汇编进行分析.
 
