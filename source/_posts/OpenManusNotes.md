@@ -1,5 +1,5 @@
 ---
-title: OpenManus学习笔记
+title: OpenManus源码学习笔记
 categories:
   - Tech
 tags:
@@ -8,7 +8,7 @@ date: 2025-07-15 20:23:51
 ---
 
 
-# OpenManus学习笔记
+# OpenManus源码学习笔记
 
 此文档用作记录OpenManus的学习笔记, OpenManus[原始仓库](https://github.com/FoundationAgents/OpenManus).
 
@@ -27,8 +27,9 @@ date: 2025-07-15 20:23:51
 
 OpenManus是遵循ReAct设计Single Agent, 核心操作由Think和Act构成. Think流程负责控制本轮次需要使用的Tools; Act流程负责执行Tools.
 
-
 OpenManus封装了5个工具集, 其中包含23个等效工具, 并实现了2种工作模式(Non-Flow && Flow), 下面分别记录.
+
+<font color="red">以下对代码逻辑的记录截止于2025-07-23 00:00:00 UTC+8</font>
 
 
 
@@ -538,7 +539,7 @@ OpenManus将这个Tool交给llm生成调用参数, 而llm生成create调用时, 
 
 在OpenManus的实现中, N个子任务顺序被送进同一个Manus Agent对象, 这个Agent的执行轮数**递增**.
 
-即在Flow模式下, 实际执行的步数仍然受限于Manus Agent的step limit, 默认是25.
+即在Flow模式下, 实际执行的步数仍然受限于Manus Agent的step limit, 默认是20.
 
 
 
@@ -594,3 +595,6 @@ If you want to stop the interaction at any point, use the `terminate` tool/funct
 OpenManus没有上下文压缩, 只是通过简单地丢弃早期的message来保证消息列表的长度不过长.
 
 默认是保存近期100条消息.
+
+## 总结
+OpenManus是一个原型级别的项目, 其内部设计包含了Single ReAct Agent所需要的全部基础组件, 实现了基本的ReAct流程, 非常适合用于建立对这一模型的认知.
