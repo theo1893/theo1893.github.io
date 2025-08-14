@@ -66,3 +66,9 @@ deploy:
 marked:
   prependRoot: true
   postAsset: true
+  gfm: true
+  breaks: false
+  tables: true
+  smartLists: true
+  smartypants: true
+  sanitize: false
