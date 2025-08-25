@@ -89,7 +89,7 @@ if __name__ == "__main__":
 
 ```
 
-其等效的图结构如下图所示:
+其等效的图结构如下图所示, node3:
 
 ![](graph.svg)
 
@@ -215,3 +215,49 @@ builder.add_edge("node1", "sub_graph")
 此时, 异常处理完毕, sub_graph正常执行完成. 在主图的下一轮循环扫描任务时, 由于node2的触发通道被写入了消息, 因此node2被激活. 
 
 通过这样的方式, LangGraph实现了子图到上层图的执行权转移, 实现了跨图的动态路由.
+
+
+
+#### 子图节点返回多条Command的处理
+
+这种情况不应该出现, 属于图的设计缺陷, 但这里仍然记录一下这一场景, 以及LangGraph的处理方式.
+
+这里使用的图结构如下图所示:
+
+![](multi_command_from_sub_graph.svg)
+
+子图sub_graph包含3个节点. 从图中可以看出, 在sub_graph的第2轮super step会存在node3和node4这2个任务, 而node3和node4分别使用Command指向上层图的node5和node2.
+
+在LangGraph的实现中, **仅有其中某一个Command能够生效**. 部分执行代码如下所示:
+
+``` python
+while True:
+    try:
+        # clear any writes from previous attempts
+        task.writes.clear()
+        # run the task
+        # 这里执行具体的task
+        return task.proc.invoke(task.input, config)
+    except ParentCommand as exc:
+        # 捕获第一个ParentCommand, 捕获完成后此函数正常退出
+        ns: str = config[CONF][CONFIG_KEY_CHECKPOINT_NS]
+        cmd = exc.args[0]
+        if cmd.graph in (ns, task.name):
+            # this command is for the current graph, handle it
+            for w in task.writers:
+                w.invoke(cmd, config)
+            break
+        elif cmd.graph == Command.PARENT:
+            # this command is for the parent graph, assign it to the parent
+            parts = ns.split(NS_SEP)
+            if parts[-1].isdigit():
+                parts.pop()
+            parent_ns = NS_SEP.join(parts[:-1])
+            exc.args = (replace(cmd, graph=parent_ns),)
+        # bubble up
+        raise
+```
+
+
+
+对上层图而言, sub_graph是单个节点, 能且仅能抛出1个异常, 而每个节点只被允许抛出1个异常. 因此sub_graph向上抛出的2个ParentCommand异常, 仅有第1个可以被处理. 另外, 由于super step的任务执行使用线程池并发, 因而不保证完成顺序, 最终结果是node3和node4中的某个Command生效.
