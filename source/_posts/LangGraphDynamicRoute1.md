@@ -183,6 +183,8 @@ if __name__ == "__main__":
 
 和前面一段代码的不同之处在于, 这里的router返回的是**Sequence[Send]**. ConditionalEdge可以返回多个Send, 实现在下一次Super Step同时触发多个节点的执行.
 
+这里需要的注意的是, 如果多个Send均路由向同一个节点, 那么每个Send会被当做单独任务, 在下一轮Super Step时被执行.
+
 
 
 ### \__pregel\_tasks通道
