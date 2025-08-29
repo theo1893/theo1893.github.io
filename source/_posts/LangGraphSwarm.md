@@ -129,7 +129,7 @@ def handoff_to_agent(
     )
 ```
 
-可见handoff工具的作用有2:
+可见handoff工具的作用有二:
 
 1. 产生一条ToolMessage;
 2. 使用Command跳出当前图, 将控制权转移到上层图的指定agent;
