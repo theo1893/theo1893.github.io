@@ -183,8 +183,6 @@ if __name__ == "__main__":
 
 和前面一段代码的不同之处在于, 这里的router返回的是**Sequence[Send]**. ConditionalEdge可以返回多个Send, 实现在下一次Super Step同时触发多个节点的执行.
 
-这里需要的注意的是, 如果多个Send均路由向同一个节点, 那么每个Send会被当做单独任务, 在下一轮Super Step时被执行.
-
 
 
 ### \__pregel\_tasks通道
@@ -207,3 +205,4 @@ Pregel在node1执行结束后, 向\__pregel\_tasks通道写入一条Send("node2"
 
 1. Send对象只能在ConditionalEdge场景下使用, 因为普通的Node没有支持Send对象的返回处理.
 2. Send对象的arg参数即为node执行接收到的参数. **Pregel不会单独为node构造请求入参, 即指定的node不会获得比arg更多的传入信息**. 因此如果arg为{}, 则node的入参即为{}.
+3. 每个Send对象会被当做单独的任务进行处理, 如果多个Send均路由向同一个节点, 那么在下一轮Super Step即会产生多个任务被分别执行.
