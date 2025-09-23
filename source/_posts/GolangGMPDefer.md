@@ -23,8 +23,8 @@ tags:
 type g struct {
     ......
 
-	_panic		*_panic		// panic链
-	_defer		*_defer		// defer链
+    _panic    *_panic		// panic链
+    _defer    *_defer		// defer链
     
     ......
 }
@@ -33,10 +33,10 @@ type g struct {
 type _defer struct {
     ......
 
-	sp        uintptr // defer时的sp, 用于判断属于哪个函数的函数栈
-	pc        uintptr // defer时的pc, 用于在panic场景下恢复执行
-	fn        func()  // 函数指针
-	link      *_defer // 在链表中指向下一个defer
+    sp    uintptr // defer时的sp, 用于判断属于哪个函数的函数栈
+    pc    uintptr // defer时的pc, 用于在panic场景下恢复执行
+    fn    func()  // 函数指针
+    link  *_defer // 在链表中指向下一个defer
     
     ......
 }
@@ -45,12 +45,12 @@ type _defer struct {
 type _panic struct {
     ......
     
-    sp unsafe.Pointer   // _panic属于的函数栈帧, 用于判断这个_panic的归属
-	arg  any            // panic的参数
-	link *_panic        // 在链表中指向下一个panic
-	retpc uintptr       // 在panic场景下恢复执行的pc, 来源_defer.pc
-	recovered   bool    // 标记这个panic是否已经被recover
-    deferreturn bool    // 标记这个panic是否是由deferreturn产生
+    sp          unsafe.Pointer    // _panic属于的函数栈帧, 用于判断这个_panic的归属
+    arg         any               // panic的参数
+    link        *_panic           // 在链表中指向下一个panic
+    retpc       uintptr           // 在panic场景下恢复执行的pc, 来源_defer.pc
+    recovered   bool              // 标记这个panic是否已经被recover
+    deferreturn bool              // 标记这个panic是否是由deferreturn产生
     
     ......
 }
@@ -90,7 +90,7 @@ func foo2() {
 	defer func() {
 		fmt.Println("foo2 defer")
 	}()
-    foo3()
+	foo3()
 }
 
 func foo3() {
@@ -112,14 +112,14 @@ func deferproc(fn func()) {
 		throw("defer on system stack")
 	}
 
-    // 新建defer结构
+	// 新建defer结构
 	d := newdefer()
     
-    // 把最新的defer放进_defer队头
+	// 把最新的defer放进_defer队头
 	d.link = gp._defer
 	gp._defer = d
     
-    // 保存defer的函数指针, 以及调用者的sp, pc
+	// 保存defer的函数指针, 以及调用者的sp, pc
 	d.fn = fn
 	d.pc = getcallerpc()
 	d.sp = getcallersp()
@@ -150,14 +150,14 @@ deferreturn函数的代码如下:
 
 ```go
 func deferreturn() {
-    // 创建_panic结构, 标记这个_panic是defer流程, 和真正的panic无关
+	// 创建_panic结构, 标记这个_panic是defer流程, 和真正的panic无关
 	var p _panic
 	p.deferreturn = true
 
-    // 设置_panic的栈帧为调用函数
+	// 设置_panic的栈帧为调用函数
 	p.start(getcallerpc(), unsafe.Pointer(getcallersp()))
 	for {
-        // 尝试获取下一个可执行的defer函数
+		// 尝试获取下一个可执行的defer函数
 		fn, ok := p.nextDefer()
 		if !ok {
 			break
@@ -215,7 +215,7 @@ func foo2() {
 	defer func() {
 		fmt.Println("foo2 defer")
 	}()
-    foo3()
+	foo3()
 }
 
 func foo3() {
@@ -223,7 +223,7 @@ func foo3() {
 		fmt.Println("foo3 defer")
 	}()
     
-    panic("test panic")
+	panic("test panic")
 }
 ```
 
@@ -236,10 +236,10 @@ func foo3() {
 ```go
 func gorecover(argp uintptr) any {
 	gp := getg()
-    // 获取panic链表头
+	// 获取panic链表头
 	p := gp._panic
 	if p != nil && !p.goexit && !p.recovered && argp == uintptr(p.argp) {
-        // 修改p.recovered字段, 标记此panic被捕获
+		// 修改p.recovered字段, 标记此panic被捕获
 		p.recovered = true
 		return p.arg
 	}
@@ -261,17 +261,17 @@ gorecover的逻辑非常简单: 获取当前g的panic链表的表头元素, 将�
 func gopanic(e any) {
 	......
 
-    // 设置_panic的参数
+	// 设置_panic的参数
 	var p _panic
 	p.arg = e
 
 	runningPanicDefers.Add(1)
 
-    // 设置_panic的初始栈帧
-    // 注意, 由于p不是由deferreturn产生, p会被写入g._panic
+	// 设置_panic的初始栈帧
+	// 注意, 由于p不是由deferreturn产生, p会被写入g._panic
 	p.start(getcallerpc(), unsafe.Pointer(getcallersp()))
 	for {
-        // 同样, 寻找下一个defer函数执行
+		// 同样, 寻找下一个defer函数执行
 		fn, ok := p.nextDefer()
 		if !ok {
 			break
@@ -281,7 +281,7 @@ func gopanic(e any) {
 
 	preprintpanics(&p)
 
-    // 在此函数内部打印panic信息, 并退出进程
+	// 在此函数内部打印panic信息, 并退出进程
 	fatalpanic(&p)
 	*(*int)(nil) = 0
 }

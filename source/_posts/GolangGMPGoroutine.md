@@ -71,10 +71,10 @@ TEXT runtime·mstart_stub(SB),NOSPLIT,$28
 	MOVL	SI, si-12(SP)
 	MOVL	DI, di-16(SP)
 
-	MOVL	32(SP), AX			// 获取入参, 即m4
+	MOVL	32(SP), AX		// 获取入参, 即m4
 	MOVL	m_g0(AX), DX		// 获取m4.g0
 	get_tls(CX)
-	MOVL	DX, g(CX)			// 把m4.g0写入TLS, 后续作用域即为m.g0
+	MOVL	DX, g(CX)		// 把m4.g0写入TLS, 后续作用域即为m.g0
 
 	CALL	runtime·mstart(SB)	// 启动m4
 

@@ -28,32 +28,32 @@ G是用户层协程的逻辑表征, 同时也是Golang程序运行时的最小�
 ``` go
 // 栈结构
 type stack struct {
-	lo uintptr
-	hi uintptr
+    lo uintptr
+    hi uintptr
 }
 
 // 协程入口结构
 type gobuf struct {
-	sp   uintptr	// 栈指针
-	pc   uintptr	// pc指针
-	g    guintptr	// g指针
+    sp   uintptr	// 栈指针
+    pc   uintptr	// pc指针
+    g    guintptr	// g指针
 
-	......
+    ......
 }
 
 // G结构
 type g struct {
-	stack		stack		// 协程栈
+    stack		stack       // 协程栈
 
-	_panic		*_panic		// panic链
-	_defer		*_defer		// defer链
-	m			*m			// 绑定的m
-	sched		gobuf		// 协程的入口函数相关信息
+    _panic		*_panic     // panic链
+    _defer		*_defer	    // defer链
+    m			*m          // 绑定的m
+    sched		gobuf       // 协程的入口函数相关信息
 
-	goid			uint64	// 当前协程id
-	parentGoid		uint64	// 父协程id
+    goid		uint64  // 当前协程id
+    parentGoid		uint64	// 父协程id
 
-	......
+    ......
 }
 ```
 
@@ -79,26 +79,26 @@ P是处理器的逻辑表征. P的数量在程序初始化时确定, 默认数�
 
 ``` go
 const (
-	// 当前p空闲
-	_Pidle = iota
+    // 当前p空闲
+    _Pidle = iota
 
-	// 当前p正在运行用户代码
-	_Prunning
+    // 当前p正在运行用户代码
+    _Prunning
 
-	// 当前p在系统调用中
-	_Psyscall
+    // 当前p在系统调用中
+    _Psyscall
 
-	// 当前p被gc的STW影响而暂停
-	_Pgcstop
+    // 当前p被gc的STW影响而暂停
+    _Pgcstop
 
-	// 当前p不再使用
-	_Pdead
+    // 当前p不再使用
+    _Pdead
 )
 
 // P结构
 type p struct {
 	id          int32
-	status      uint32		// 当前p状态
+	status      uint32	// 当前p状态
 	link        puintptr	// 指向下一个p, 用于将IDLE状态的p串起来
 	m           muintptr	// 当前p绑定的m
 
@@ -106,7 +106,7 @@ type p struct {
 	runqhead uint32
 	runqtail uint32
 	runq     [256]guintptr
-	runnext guintptr
+	runnext  guintptr
 
 	......
 }
@@ -122,11 +122,11 @@ type p struct {
 
 ``` go
 type m struct {
-	g0      *g				// 用于调度的g
+	g0            *g        // 用于调度的g
 	procid        uint64	// 线程id
 	mstartfn      func()	// m启动函数, **不是线程入口函数**
-	curg          *g       // 需要执行的g
-	p             puintptr // 绑定的p
+	curg          *g        // 需要执行的g
+	p             puintptr  // 绑定的p
 
 	......
 }

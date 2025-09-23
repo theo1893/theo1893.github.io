@@ -31,11 +31,11 @@ type hchan struct {
 	buf      unsafe.Pointer // buffer入口地址, 环形数组
 	elemsize uint16         // 元素大小
 	closed   uint32         // 0-未关闭; 1-关闭
-	elemtype *_type // 元素类型
-	sendx    uint   // buffer的发送索引, 下一个发送数据往buf[sendx]写入
-	recvx    uint   // buffer的接受索引, 下一个接收数据从buf[recvx]读取
-	recvq    waitq  // 阻塞监听此通道的g列表
-	sendq    waitq  // 阻塞写入此通道的g列表
+	elemtype *_type 	// 元素类型
+	sendx    uint   	// buffer的发送索引, 下一个发送数据往buf[sendx]写入
+	recvx    uint  		// buffer的接受索引, 下一个接收数据从buf[recvx]读取
+	recvq    waitq 		// 阻塞监听此通道的g列表
+	sendq    waitq 		// 阻塞写入此通道的g列表
 
 	lock mutex
 }
@@ -58,13 +58,13 @@ func makechan(t *chantype, size int) *hchan {
 		throw("makechan: bad alignment")
 	}
 
-    // 检查通道是否超过大小限制
+	// 检查通道是否超过大小限制
 	mem, overflow := math.MulUintptr(elem.Size_, uintptr(size))
 	if overflow || mem > maxAlloc-hchanSize || size < 0 {
 		panic(plainError("makechan: size out of range"))
 	}
 
-    // 初始化hchan对象, 并为buf分配指定大小的内存
+	// 初始化hchan对象, 并为buf分配指定大小的内存
 	var c *hchan
 	switch {
 	case mem == 0:

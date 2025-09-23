@@ -34,11 +34,11 @@ tags:
 
 ``` asm
 TEXT _rt0_386(SB),NOSPLIT,$8
-	MOVL	8(SP), AX	// argc
-	LEAL	12(SP), BX	// argv
-	MOVL	AX, 0(SP)
-	MOVL	BX, 4(SP)
-	JMP	runtime·rt0_go(SB)	// 跳转到rt0_go
+	MOVL    8(SP), AX            // argc
+	LEAL    12(SP), BX           // argv
+	MOVL    AX, 0(SP)
+	MOVL    BX, 4(SP)
+	JMP     runtime·rt0_go(SB)   // 跳转到rt0_go
 ```
 
 在设置好argc和argv参数后, 就调用runtime·rt0_go进入下一流程.
@@ -64,13 +64,12 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 	// 操作线程本地变量寄存器TLS, 由于此时处在1号线程内, 因此下面操作的是1号线程TLS
 	get_tls(BX)
 	LEAL	runtime·g0(SB), DX	// 把全局变量g0的地址写入DX
-	MOVL	DX, g(BX)			// 把DX的值存入TLS
+	MOVL	DX, g(BX)		// 把DX的值存入TLS
 	LEAL	runtime·m0(SB), AX	// 把全局变量m0的地址写入AX
 
-	// save m0->g0 = g0
-	MOVL	DX, m_g0(AX)		// 如官方注释, 这条指令等效于m0->g0 = g0
-	// save g0->m = m0
-	MOVL	AX, g_m(DX)			// 见官方注释
+	// 将g0和m0绑定
+	MOVL	DX, m_g0(AX)		
+	MOVL	AX, g_m(DX)		
 
 	......
 
@@ -87,7 +86,6 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 	CALL	runtime·newproc(SB)	// 使用runtime·mainPC地址调用runtime·newproc, 下文详细介绍
 	POPL	AX
 
-	// start this M
 	CALL	runtime·mstart(SB)	// 启动全局m0
 
 	CALL	runtime·abort(SB)
@@ -104,7 +102,7 @@ TEXT runtime·rt0_go(SB),NOSPLIT|NOFRAME|TOPFRAME,$0
 
 ``` go
 func schedinit() {
-	......
+    ......
     
     // 设置m的最大数量为10000
     sched.maxmcount = 10000
@@ -113,13 +111,13 @@ func schedinit() {
     
     // 设置p的数量, 优先为GOMAXPROCS, 次优为初始化时检测到的cpu核数
     procs := ncpu
-	if n, ok := atoi32(gogetenv("GOMAXPROCS")); ok && n > 0 {
-		procs = n
-	}
+    if n, ok := atoi32(gogetenv("GOMAXPROCS")); ok && n > 0 {
+        procs = n
+    }
     // 初始化p
-	if procresize(procs) != nil {
-		throw("unknown runnable goroutine during bootstrap")
-	}
+    if procresize(procs) != nil {
+        throw("unknown runnable goroutine during bootstrap")
+    }
     
     ......
 }
@@ -216,7 +214,7 @@ TEXT runtime·gogo(SB), NOSPLIT, $0-4
 
 TEXT gogo<>(SB), NOSPLIT, $0
 	get_tls(CX)
-	MOVL	DX, g(CX)			// 从g0切换到newg
+	MOVL	DX, g(CX)		// 从g0切换到newg
 	MOVL	gobuf_sp(BX), SP	// 重写部分寄存器
 	MOVL	gobuf_ret(BX), AX
 	MOVL	gobuf_ctxt(BX), DX
@@ -224,7 +222,7 @@ TEXT gogo<>(SB), NOSPLIT, $0
 	MOVL	$0, gobuf_ret(BX)
 	MOVL	$0, gobuf_ctxt(BX)
 	MOVL	gobuf_pc(BX), BX	// 把PC写入BX
-	JMP	BX						// 跳转BX执行代码
+	JMP	BX			// 跳转BX执行代码
 ```
 
 执行到这一步为止, 我们的程序已经切换到newg的作用域, 做好准备代码的准备. 下面介绍main函数的真正入口.
@@ -242,13 +240,15 @@ DATA	runtime·mainPC+0(SB)/4,$runtime·main(SB)	// 指向runtime.main
 在这里我们仅关心runtime·main的一个操作: 调用main_main函数, 而main_main函数会被链接到main.main, 即用户可感知的main函数.
 
 ``` go
+// 对main_main的调用会被重定向到main package下的main函数, 即我们编写的程序入口函数
 //go:linkname main_main main.main
 func main_main()
 
+// 运行库中的main函数, 用户不感知
 func main() {
-	......
+    ......
     fn := main_main 
-	fn()
+    fn()
     ......
 }
 ```
