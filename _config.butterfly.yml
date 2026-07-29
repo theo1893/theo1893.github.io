@@ -937,6 +937,7 @@ CDN:
   custom_format:
 
   option:
+    busuanzi: busuanzi.ibruce.info
     # abcjs_basic_js:
     # activate_power_mode:
     # algolia_js:
