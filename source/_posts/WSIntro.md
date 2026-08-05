@@ -1,5 +1,5 @@
 ---
-title: WebSocket 学习笔记(1) 协议实现
+title: WebSocket 学习笔记(1) 协议设计
 date: 2026-07-31 16:09:13
 categories:
 - Tech
