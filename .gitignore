@@ -6,6 +6,9 @@ node_modules/
 !public
 public/*
 !public/img
+public/img/butterfly-icon.png
+public/img/error-page.png
+public/img/favicon.ico
 .deploy*/
 _multiconfig.yml
 source/_posts/*/*.bkp
