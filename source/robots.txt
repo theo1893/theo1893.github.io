@@ -8,3 +8,4 @@ User-agent: *
 Allow: /
 
 Sitemap: https://theo1893.github.io/sitemap.xml
+Sitemap: https://theo1893.github.io/image-sitemap.xml

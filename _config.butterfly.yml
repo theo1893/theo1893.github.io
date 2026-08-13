@@ -874,8 +874,9 @@ pangu:
 # Lazyload (圖片懶加載)
 # https://github.com/verlok/vanilla-lazyload
 lazyload:
-  enable: false
-  field: site # site/post
+  enable: true
+  native: true
+  field: post # site/post
   placeholder:
   blur: false
 

@@ -15,6 +15,24 @@ function compactText (value) {
     .trim()
 }
 
+function proseText (value) {
+  if (!value) return ''
+
+  const html = String(value)
+    .replace(/<figure\b[^>]*>[\s\S]*?<\/figure>/gi, ' ')
+    .replace(/<(pre|table|script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, ' ')
+  const paragraphs = []
+  const paragraphPattern = /<p\b[^>]*>([\s\S]*?)<\/p>/gi
+  let match
+
+  while ((match = paragraphPattern.exec(html)) !== null) {
+    const paragraph = compactText(match[1])
+    if (paragraph) paragraphs.push(paragraph)
+  }
+
+  return paragraphs.length ? paragraphs.join(' ') : compactText(html)
+}
+
 function escapeAttribute (value) {
   return String(value)
     .replace(/&/g, '&amp;')
@@ -25,9 +43,8 @@ function escapeAttribute (value) {
 
 function pageDescription (page, config) {
   const title = compactText(page.title)
-  let description = compactText(
-    page.description || page.excerpt || page.content || config.description
-  )
+  const source = page.description || page.excerpt || page.content || config.description
+  let description = proseText(source)
 
   if (title && description.startsWith(title)) {
     description = description.slice(title.length).trim()
@@ -36,7 +53,7 @@ function pageDescription (page, config) {
   return (description || compactText(config.description)).slice(0, 200)
 }
 
-function taxonomyNames (taxonomy) {
+function taxonomyItems (taxonomy) {
   if (!taxonomy) return []
 
   let items
@@ -48,9 +65,14 @@ function taxonomyNames (taxonomy) {
     items = [taxonomy]
   }
 
-  return items
-    .map(item => compactText(item && item.name ? item.name : item))
-    .filter(Boolean)
+  return items.map(item => ({
+    name: compactText(item && item.name ? item.name : item),
+    path: item && item.path ? String(item.path) : undefined
+  })).filter(item => item.name)
+}
+
+function taxonomyNames (taxonomy) {
+  return taxonomyItems(taxonomy).map(item => item.name)
 }
 
 function toIsoString (value) {
@@ -108,6 +130,40 @@ function authorEntity (config, siteUrl) {
   return author
 }
 
+function postBreadcrumb (page, config, siteUrl, canonicalUrl) {
+  const elements = [{
+    name: config.title,
+    url: siteUrl
+  }]
+  const category = taxonomyItems(page.categories)[0]
+
+  if (category && category.path) {
+    const categoryUrl = absoluteUrl(category.path, siteUrl)
+    if (categoryUrl) {
+      elements.push({
+        name: category.name,
+        url: categoryUrl
+      })
+    }
+  }
+
+  elements.push({
+    name: compactText(page.title),
+    url: canonicalUrl
+  })
+
+  return {
+    '@type': 'BreadcrumbList',
+    '@id': `${canonicalUrl}#breadcrumb`,
+    itemListElement: elements.map((element, index) => ({
+      '@type': 'ListItem',
+      position: index + 1,
+      name: element.name,
+      item: element.url
+    }))
+  }
+}
+
 function createJsonLd (page, config, canonicalUrl, description) {
   const siteUrl = new URL(config.root || '/', `${config.url}/`).href
   const language = page.lang || page.language || config.language
@@ -120,8 +176,8 @@ function createJsonLd (page, config, canonicalUrl, description) {
     const images = articleImages(page, canonicalUrl)
     const categories = taxonomyNames(page.categories)
     const tags = taxonomyNames(page.tags)
+    const breadcrumb = postBreadcrumb(page, config, siteUrl, canonicalUrl)
     const article = {
-      '@context': 'https://schema.org',
       '@type': 'BlogPosting',
       '@id': `${canonicalUrl}#article`,
       mainEntityOfPage: {
@@ -143,13 +199,20 @@ function createJsonLd (page, config, canonicalUrl, description) {
       isAccessibleForFree: true
     }
 
+    article.breadcrumb = {
+      '@id': breadcrumb['@id']
+    }
+
     const dateModified = toIsoString(page.updated)
     if (dateModified) article.dateModified = dateModified
     if (images.length) article.image = images
     if (categories.length) article.articleSection = categories
     if (tags.length) article.keywords = tags
 
-    return article
+    return {
+      '@context': 'https://schema.org',
+      '@graph': [article, breadcrumb]
+    }
   }
 
   if (isHome) {

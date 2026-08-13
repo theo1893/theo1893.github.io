@@ -45,11 +45,33 @@ function jsonLdObjects (html, relativePath) {
 
 function objectHasType (object, type) {
   if (!object || typeof object !== 'object') return false
-  if (object['@type'] === type) return true
-  return Array.isArray(object['@graph']) && object['@graph'].some(item => item['@type'] === type)
+  const objectTypes = Array.isArray(object['@type']) ? object['@type'] : [object['@type']]
+  return objectTypes.includes(type)
 }
 
-for (const requiredFile of ['robots.txt', 'sitemap.xml', 'atom.xml', 'index.html']) {
+function findObjectByType (objects, type) {
+  for (const object of objects) {
+    if (objectHasType(object, type)) return object
+
+    if (object && Array.isArray(object['@graph'])) {
+      const match = findObjectByType(object['@graph'], type)
+      if (match) return match
+    }
+  }
+
+  return undefined
+}
+
+function escapeXml (value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;')
+}
+
+for (const requiredFile of ['robots.txt', 'sitemap.xml', 'image-sitemap.xml', 'atom.xml', 'index.html']) {
   if (!fs.existsSync(path.join(publicDir, requiredFile))) {
     fail(`missing public/${requiredFile}`)
   }
@@ -65,9 +87,22 @@ if (fs.existsSync(path.join(publicDir, 'robots.txt'))) {
   for (const directive of [
     'User-agent: OAI-SearchBot',
     'User-agent: PerplexityBot',
-    'Sitemap: https://theo1893.github.io/sitemap.xml'
+    'Sitemap: https://theo1893.github.io/sitemap.xml',
+    'Sitemap: https://theo1893.github.io/image-sitemap.xml'
   ]) {
     if (!robots.includes(directive)) fail(`robots.txt: missing ${directive}`)
+  }
+}
+
+let imageSitemap = ''
+if (fs.existsSync(path.join(publicDir, 'image-sitemap.xml'))) {
+  imageSitemap = read(path.join(publicDir, 'image-sitemap.xml'))
+
+  if (!imageSitemap.includes('xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"')) {
+    fail('image-sitemap.xml: missing Google image namespace')
+  }
+  if (!imageSitemap.includes('<image:loc>')) {
+    fail('image-sitemap.xml: no images were found')
   }
 }
 
@@ -98,11 +133,14 @@ if (fs.existsSync(publicDir)) {
     if (!description || !description[1] || description[1].includes('This is nil.')) {
       fail(`${relativePath}: missing or placeholder meta description`)
     }
+    if (description && /\d{20,}/.test(description[1])) {
+      fail(`${relativePath}: meta description appears to contain code line numbers`)
+    }
     if (!objects.length) {
       fail(`${relativePath}: missing JSON-LD`)
     }
 
-    const article = objects.find(object => objectHasType(object, 'BlogPosting'))
+    const article = findObjectByType(objects, 'BlogPosting')
     if (article) {
       articleCount += 1
       if (article.url !== canonical[1]) {
@@ -113,6 +151,23 @@ if (fs.existsSync(publicDir)) {
       }
       if (sitemap && !sitemap.includes(`<loc>${canonical[1]}</loc>`)) {
         fail(`${relativePath}: canonical URL is absent from sitemap.xml`)
+      }
+
+      const breadcrumb = findObjectByType(objects, 'BreadcrumbList')
+      if (!breadcrumb || !Array.isArray(breadcrumb.itemListElement)) {
+        fail(`${relativePath}: missing BreadcrumbList JSON-LD`)
+      } else {
+        const lastItem = breadcrumb.itemListElement.at(-1)
+        if (breadcrumb.itemListElement.length < 2 || !lastItem || lastItem.item !== canonical[1]) {
+          fail(`${relativePath}: BreadcrumbList does not end at the canonical URL`)
+        }
+      }
+
+      const images = Array.isArray(article.image) ? article.image : []
+      for (const image of images) {
+        if (imageSitemap && !imageSitemap.includes(`<image:loc>${escapeXml(image)}</image:loc>`)) {
+          fail(`${relativePath}: article image is absent from image-sitemap.xml`)
+        }
       }
     }
   }
