@@ -1,6 +1,6 @@
 ---
 title: HTTP/2 源码图解(3) HTTP/2 Client流程分析
-date: 2026-08-7 14:24:34
+date: 2026-08-07 14:24:34
 categories:
 - Tech
 tags:
@@ -103,7 +103,11 @@ HTTP/2协议规定每个请求(大部分)要和Stream绑定, 因此获取到可�
 
 ## 写入HTTP Header
 
-获取可用Stream后, 客户端开始向其中写入数据. 标准HTTP/2请求的第1个帧是Header帧, 客户端向Stream写入HPACK编码后的HTTP Header.
+获取可用Stream后, 客户端首先等待接收**服务端在连接维度发送的Setting帧**对连接进行初始化.
+
+客户端收到第一个InitialWindowSize Setting帧后, 回复服务端Setting ACK, 本条HTTP/2连接正式建立完成, 客户端此后开始向其中写入数据.
+
+标准HTTP/2请求的第1个帧是Header帧, 客户端向Stream写入HPACK编码后的HTTP Header.
 
 ![](write_header.png)
 
