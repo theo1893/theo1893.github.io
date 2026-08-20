@@ -184,3 +184,50 @@ GoAway帧用于通信双方进行连接关闭前的同步. 假设服务端收到
 
 ![](resp_process.png)
 
+
+
+## 被取消的功能: 服务端主动推送
+
+HTTP/2在设计之初, 为了解决HTTP/1.x通过轮询来实现伪服务器推送的问题, 设计了服务端主动推送(Push)的功能. 然而截止2026年, 已经不存在任何主流HTTP客户端支持HTTP/2的主动推送的功能.
+
+这里仅针对Golang标准库中对HTTP/2主动推送的遗留代码, 简单介绍服务端侧的推送实现逻辑.
+
+为了实现推送, 服务端至少需要注册2个Handler, 一个用于客户端触发推送, 一个用于实际的推送逻辑. 示例代码块如下所示:
+
+``` go
+// HTTP/2 实际的推送处理逻辑
+func PushAlertHandler(w http.ResponseWriter, r *http.Request) {
+	log.Println("/alert")
+
+	time.Sleep(3 * time.Second)
+	w.Header().Set("Content-Type", "application/javascript")
+	w.Write([]byte(`alert("you got me");`))
+}
+
+// HTTP/2 触发服务端开启推送
+func ServerPushHandler(w http.ResponseWriter, r *http.Request) {
+	if pw, ok := w.(http.Pusher); ok {
+		log.Println("attempting push")
+		if err := pw.Push("/alert", nil); err != nil {
+			log.Println("push failed")
+		}
+	}
+	time.Sleep(3 * time.Second)
+	w.Header().Set("Content-Type", "text/html")
+	w.Write([]byte("<!DOCTYPE html><html><head><script src=\"/alert\"></script></head><body><p>This is an example server.</p></body></html>"))
+}
+```
+
+服务端主动推送的步骤如下:
+
+1. 服务端的Push Trigger收到客户端调用;
+2. 服务端构造PushPromise帧, 推送给客户端;
+3. 服务端**自我调用**, 构造常规Header和Data帧, 在指定的stream中推送给客户端;
+
+其流程如下图所示:
+
+![](push_process.png)
+
+从上图可见, HTTP/2所谓的服务端推送, 本质上是客户端的一次HTTP调用, 触发了服务端的一次特殊的长时逻辑处理.
+
+并且从上图还能发现, PushPromise帧和正常HTTP帧的推送是并发执行的, **而在Golang原生库中并未发现协程间同步的使用**. 由于目前已经找不到支持HTTP/2推送的客户端, 因此无法确定HTTP/2客户端按预期是如何处理服务端推送的数据. 
